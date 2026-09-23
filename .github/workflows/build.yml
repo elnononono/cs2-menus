@@ -64,6 +64,9 @@ jobs:
           cd ../..
 
           git clone https://github.com/pisex/SchemaEntity.git
+          # hl2sdk #421 dropped transitive includes of gametrace.h (Ray_t, CHitBox, HitGroup_t)
+          sed -i 's|#include "schemasystem.h"|#include <gametrace.h>
+#include "schemasystem.h"|' SchemaEntity/globaltypes.h
 
       - name: Configure and build plugin
         shell: bash
