@@ -64,10 +64,7 @@ jobs:
           cd ../..
 
           git clone https://github.com/pisex/SchemaEntity.git
-          # hl2sdk #421 dropped transitive includes of gametrace.h (Ray_t, CHitBox, HitGroup_t)
-          sed -i '1i #include <gametrace.h>' SchemaEntity/globaltypes.h
-          # NetworkStateChanged_t was renamed to NetworkStateChangedData in hl2sdk
-          sed -i 's/NetworkStateChanged_t/NetworkStateChangedData/g' SchemaEntity/schemasystem.cpp
+          bash cs2-menus/.github/patch_schemaentity.sh SchemaEntity
 
       - name: Configure and build plugin
         shell: bash
@@ -84,11 +81,12 @@ jobs:
         run: |
           # Surface the first compiler errors as annotations so they are visible without the raw log
           touch build.log
-          errors=$(grep -E "error:|Error|undefined reference|Traceback|Exception" build.log | head -n 40)
+          errors=$(grep -E "error:|undefined reference|Traceback|Exception" build.log | sort -u)
           if [ -z "$errors" ]; then errors=$(tail -n 30 build.log); fi
-          echo "$errors" | while IFS= read -r line; do
+          echo "$errors" | head -n 40 | while IFS= read -r line; do
             echo "::error::${line}"
           done
+          { echo '```'; echo "$errors" | head -n 200; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Package addon into ZIP
         run: |
