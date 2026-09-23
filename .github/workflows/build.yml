@@ -68,18 +68,21 @@ jobs:
       - name: Configure and build plugin
         shell: bash
         run: |
+          set -o pipefail
           mkdir build
           cd build
-          python3 ../configure.py -s cs2 --targets x86_64 --enable-optimize --hl2sdk-manifests=./hl2sdk-manifests --mms_path=$MMS_PATH --hl2sdk-root=$HL2SDK_ROOT
-          set -o pipefail
-          ambuild 2>&1 | tee ambuild.log
+          python3 ../configure.py -s cs2 --targets x86_64 --enable-optimize --hl2sdk-manifests=./hl2sdk-manifests --mms_path=$MMS_PATH --hl2sdk-root=$HL2SDK_ROOT 2>&1 | tee ../build.log
+          ambuild 2>&1 | tee -a ../build.log
 
       - name: Report compiler errors
         if: failure()
         shell: bash
         run: |
           # Surface the first compiler errors as annotations so they are visible without the raw log
-          grep -E "error:|Error |undefined reference" build/ambuild.log | head -n 40 | while IFS= read -r line; do
+          touch build.log
+          errors=$(grep -E "error:|Error|undefined reference|Traceback|Exception" build.log | head -n 40)
+          if [ -z "$errors" ]; then errors=$(tail -n 30 build.log); fi
+          echo "$errors" | while IFS= read -r line; do
             echo "::error::${line}"
           done
 
