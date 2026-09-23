@@ -2,7 +2,8 @@
 #define _INCLUDE_METAMOD_SOURCE_STUB_PLUGIN_H_
 
 #include <ISmmPlugin.h>
-#include <sh_vector.h>
+#include <eiface.h>
+#include <icvar.h>
 #include "utlvector.h"
 #include "ehandle.h"
 #include <iserver.h>
@@ -97,9 +98,12 @@ public:
 std::map<int, std::map<std::string, CommandCallback>> ConsoleCommands;
 std::map<int, std::map<std::string, CommandCallback>> ChatCommands;
 
+class CCSPlayerPawn;
+
 class Menus final : public ISmmPlugin, public IMetamodListener
 {
 public:
+	Menus();
 	bool Load(PluginId id, ISmmAPI* ismm, char* error, size_t maxlen, bool late);
 	bool Unload(char* error, size_t maxlen);
 	void AllPluginsLoaded();
@@ -118,19 +122,52 @@ private:
 	const char* GetLogTag();
 
 private:
-	void ClientCommand(CPlayerSlot slot, const CCommand &args);
+	// Returns true when the command was handled and the original must be skipped
+	bool ClientCommand(CPlayerSlot slot, const CCommand &args);
 	void GameFrame(bool simulating, bool bFirstTick, bool bLastTick);
 	void StartupServer(const GameSessionConfiguration_t& config, ISource2WorldSession*, const char*);
-    void OnDispatchConCommand(ConCommandRef cmd, const CCommandContext& ctx, const CCommand& args);
+	// Returns true when the command was handled and the original must be skipped
+	bool OnDispatchConCommand(ConCommandRef cmd, const CCommandContext& ctx, const CCommand& args);
 	void OnClientDisconnect( CPlayerSlot slot, ENetworkDisconnectionReason reason, const char *pszName, uint64 xuid, const char *pszNetworkID );
 	void OnGameServerSteamAPIActivated();
 	void OnValidateAuthTicketHook(ValidateAuthTicketResponse_t *pResponse);
 	void OnClientConnected( CPlayerSlot slot, const char *pszName, uint64 xuid, const char *pszNetworkID, const char *pszAddress, bool bFakePlayer );
 	bool OnClientConnect( CPlayerSlot slot, const char *pszName, uint64 xuid, const char *pszNetworkID, bool unk1, CBufferString *pRejectReason );
 	void OnClientPutInServer( CPlayerSlot slot, char const *pszName, int type, uint64 xuid );
-	void OnCheckTransmit(CCheckTransmitInfo **pInfoInfoList, int nInfoCount, CBitVec<16384> &unionTransmitEdicts, CBitVec<16384> &, const Entity2Networkable_t **pNetworkables, const uint16 *pEntityIndicies, int nEntityIndices, bool bEnablePVSBits);
+	void OnCheckTransmit(CCheckTransmitInfo **pInfoInfoList, int nInfoCount, CBitVec<16384> &unionTransmitEdicts, CBitVec<16384> &, const Entity2Networkable_t **pNetworkables, const uint16 *pEntityIndicies, int nEntityIndices);
 	void OnClientSvcUserMessage( CPlayerSlot slot, int um_type, uint32 size, const void *buf );
-	bool Hook_OnTakeDamage_Alive(CTakeDamageInfoContainer *pInfoContainer);
+	void Hook_OnTakeDamage_Alive(CCSPlayerPawn *pPawn, CTakeDamageInfoContainer *pInfoContainer);
+
+	// KHook callbacks
+	KHook::Return<void> KH_GameServerSteamAPIActivated(IServerGameDLL*);
+	KHook::Return<void> KH_GameFrame(IServerGameDLL*, bool simulating, bool bFirstTick, bool bLastTick);
+	KHook::Return<bool> KH_FireEvent(IGameEventManager2*, IGameEvent* pEvent, bool bDontBroadcast);
+	KHook::Return<void> KH_ClientCommand(IServerGameClients*, CPlayerSlot slot, const CCommand &args);
+	KHook::Return<void> KH_DispatchConCommand(ICvar*, ConCommandRef cmd, const CCommandContext& ctx, const CCommand& args);
+	KHook::Return<void> KH_StartupServer(INetworkServerService*, const GameSessionConfiguration_t& config, ISource2WorldSession* pWorldSession, const char* pszUnk);
+	KHook::Return<void> KH_ClientDisconnect(IServerGameClients*, CPlayerSlot slot, ENetworkDisconnectionReason reason, const char *pszName, uint64 xuid, const char *pszNetworkID);
+	KHook::Return<void> KH_ClientPutInServer(IServerGameClients*, CPlayerSlot slot, char const *pszName, int type, uint64 xuid);
+	KHook::Return<void> KH_OnClientConnected(IServerGameClients*, CPlayerSlot slot, const char *pszName, uint64 xuid, const char *pszNetworkID, const char *pszAddress, bool bFakePlayer);
+	KHook::Return<bool> KH_ClientConnect(IServerGameClients*, CPlayerSlot slot, const char *pszName, uint64 xuid, const char *pszNetworkID, bool unk1, CBufferString *pRejectReason);
+	KHook::Return<void> KH_CheckTransmit(ISource2GameEntities*, CCheckTransmitInfo **pInfoInfoList, int nInfoCount, CBitVec<16384> &unionTransmitEdicts, CBitVec<16384> &unk, const Entity2Networkable_t **pNetworkables, const uint16 *pEntityIndicies, int nEntityIndices);
+	KHook::Return<void> KH_ClientSvcUserMessage(IServerGameClients*, CPlayerSlot slot, int um_type, uint32 size, const void *buf);
+	KHook::Return<bool> KH_OnTakeDamage_Alive(CCSPlayerPawn* pPawn, CTakeDamageInfoContainer *pInfoContainer);
+
+	KHook::Virtual<IServerGameDLL, void> m_GameServerSteamAPIActivated;
+	KHook::Virtual<IServerGameDLL, void, bool, bool, bool> m_GameFrame;
+	KHook::Virtual<IGameEventManager2, bool, IGameEvent*, bool> m_FireEvent;
+	KHook::Virtual<IServerGameClients, void, CPlayerSlot, const CCommand&> m_ClientCommand;
+	KHook::Virtual<ICvar, void, ConCommandRef, const CCommandContext&, const CCommand&> m_DispatchConCommand;
+	KHook::Virtual<INetworkServerService, void, const GameSessionConfiguration_t&, ISource2WorldSession*, const char*> m_StartupServer;
+	KHook::Virtual<IServerGameClients, void, CPlayerSlot, ENetworkDisconnectionReason, const char*, uint64, const char*> m_ClientDisconnect;
+	KHook::Virtual<IServerGameClients, void, CPlayerSlot, char const*, int, uint64> m_ClientPutInServer;
+	KHook::Virtual<IServerGameClients, void, CPlayerSlot, const char*, uint64, const char*, const char*, bool> m_OnClientConnected;
+	KHook::Virtual<IServerGameClients, bool, CPlayerSlot, const char*, uint64, const char*, bool, CBufferString*> m_ClientConnect;
+	KHook::Virtual<ISource2GameEntities, void, CCheckTransmitInfo**, int, CBitVec<16384>&, CBitVec<16384>&, const Entity2Networkable_t**, const uint16*, int> m_CheckTransmit;
+	KHook::Virtual<IServerGameClients, void, CPlayerSlot, int, uint32, const void*> m_ClientSvcUserMessage;
+	// Offset comes from gamedata, so it is configured at load time
+	KHook::Virtual<CCSPlayerPawn, bool, CTakeDamageInfoContainer*> m_OnTakeDamage_Alive;
+	void* m_pCCSPlayerPawnVTable = nullptr;
 };
 
 class MenusApi : public IMenusApi {
