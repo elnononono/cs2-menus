@@ -66,6 +66,8 @@ jobs:
           git clone https://github.com/pisex/SchemaEntity.git
           # hl2sdk #421 dropped transitive includes of gametrace.h (Ray_t, CHitBox, HitGroup_t)
           sed -i '1i #include <gametrace.h>' SchemaEntity/globaltypes.h
+          # NetworkStateChanged_t was renamed to NetworkStateChangedData in hl2sdk
+          sed -i 's/NetworkStateChanged_t/NetworkStateChangedData/g' SchemaEntity/schemasystem.cpp
 
       - name: Configure and build plugin
         shell: bash
