@@ -53,17 +53,27 @@ jobs:
 
           mkdir -p external
           cd external
-          # Metamod 2.0 (KHook). Only the submodules needed to build a plugin are fetched,
-          # a full recursive clone pulls khook's test dependencies too.
-          git clone --depth 1 --branch master --single-branch \
-            https://github.com/alliedmodders/metamod-source.git
+          # Metamod 2.0 (KHook) and the cs2 hl2sdk are pinned: both get updated in several steps after
+          # each CS2 update, and building from a half-updated branch breaks the build. Bump the
+          # commits deliberately (and rebuild) when a newer SDK is needed.
+          MMS_REF=fa6f80e4662e5b96cc2e97722d812f374581dfd8
+          HL2SDK_REF=625bfd4e39816ad0e1eae3b3144a3b5425c5c7a0
+          fetch_ref() {
+            git init -q "$1"
+            git -C "$1" remote add origin "$2"
+            git -C "$1" fetch -q --depth 1 origin "$3"
+            git -C "$1" checkout -q FETCH_HEAD
+          }
+          fetch_ref metamod-source https://github.com/alliedmodders/metamod-source.git "$MMS_REF"
+          # Only the submodules needed to build a plugin, a full recursive clone pulls khook's test dependencies too
           git -C metamod-source submodule update --init --depth 1 third_party/khook third_party/amtl hl2sdk-manifests
-          git clone --recursive --depth 1 --branch cs2 --single-branch \
-            https://github.com/alliedmodders/hl2sdk.git hl2sdk-cs2
+          fetch_ref hl2sdk-cs2 https://github.com/alliedmodders/hl2sdk.git "$HL2SDK_REF"
 
           cd ../..
 
+          # Pinned too: patch_schemaentity.sh is written against this exact revision
           git clone https://github.com/pisex/SchemaEntity.git
+          git -C SchemaEntity checkout -q e7965b3c83ec684d44584ee6457c5482ee5d9db1
           bash cs2-menus/.github/patch_schemaentity.sh SchemaEntity
 
       - name: Configure and build plugin
